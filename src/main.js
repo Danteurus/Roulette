@@ -1,0 +1,243 @@
+
+// --- DOM Elements ---
+const canvas = document.getElementById('rouletteCanvas');
+const ctx = canvas.getContext('2d');
+const optionInput = document.getElementById('optionInput');
+const addOptionBtn = document.getElementById('addOptionBtn');
+const optionsList = document.getElementById('optionsList');
+const spinBtn = document.getElementById('spinBtn');
+const resultPopup = document.getElementById('resultPopup');
+const winnerText = document.getElementById('winnerText');
+const closePopup = document.getElementById('closePopup');
+
+// --- State ---
+let options = [];
+let spinning = false;
+let angle = 0;
+let spinTimeout = null;
+let spinAngleStart = 0;
+let spinTime = 0;
+let spinTimeTotal = 0;
+
+// Save options to localStorage
+function saveOptions() {
+    localStorage.setItem('rouletteOptions', JSON.stringify(options));
+}
+
+// Load options from localStorage
+function loadOptions() {
+    const stored = localStorage.getItem('rouletteOptions');
+    if (stored) {
+        options = JSON.parse(stored);
+    } else {
+        options = [];
+    }
+}
+
+// Draw the roulette wheel
+function drawRoulette() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(centerX, centerY) - 10;
+    const numOptions = options.length;
+    if (numOptions === 0) {
+        // Draw fallback message and faded wheel
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = '#e1e8ed';
+        ctx.fill();
+        ctx.strokeStyle = '#bbb';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = '#888';
+        ctx.font = '18px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('No options yet!', centerX, centerY - 10);
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#aaa';
+        ctx.fillText('Add options below', centerX, centerY + 16);
+        // Draw pointer
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - radius - 10);
+        ctx.lineTo(centerX - 15, centerY - radius + 10);
+        ctx.lineTo(centerX + 15, centerY - radius + 10);
+        ctx.closePath();
+        ctx.fillStyle = '#e74c3c';
+        ctx.fill();
+        ctx.restore();
+        return;
+    }
+    const arc = 2 * Math.PI / numOptions;
+    for (let i = 0; i < numOptions; i++) {
+        const startAngle = angle + i * arc;
+        const endAngle = startAngle + arc;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = getColor(i, numOptions);
+        ctx.fill();
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(startAngle + arc / 2);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 16px Arial';
+        // Truncate long options for mobile
+        let label = options[i];
+        if (canvas.width < 300 && label.length > 10) label = label.slice(0, 10) + '…';
+        ctx.fillText(label, radius - 10, 6);
+        ctx.restore();
+    }
+    // Draw pointer
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - radius - 10);
+    ctx.lineTo(centerX - 15, centerY - radius + 10);
+    ctx.lineTo(centerX + 15, centerY - radius + 10);
+    ctx.closePath();
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+    ctx.restore();
+}
+
+// Generate visually distinct colors for wheel slices
+function getColor(i, total) {
+    const hue = i * 360 / total;
+    return `hsl(${hue}, 70%, 55%)`;
+}
+
+// Update the list of options in the UI
+function updateOptionsList() {
+    optionsList.innerHTML = '';
+    if (options.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = 'No options yet. Add some!';
+        li.style.color = '#888';
+        li.style.textAlign = 'center';
+        optionsList.appendChild(li);
+        spinBtn.disabled = true;
+    } else {
+        spinBtn.disabled = options.length < 2;
+        options.forEach((opt, idx) => {
+            const li = document.createElement('li');
+            li.textContent = opt;
+            const btn = document.createElement('button');
+            btn.textContent = 'Remove';
+            btn.className = 'remove-btn';
+            btn.onclick = () => {
+                options.splice(idx, 1);
+                saveOptions();
+                updateOptionsList();
+                drawRoulette();
+            };
+            li.appendChild(btn);
+            optionsList.appendChild(li);
+        });
+    }
+}
+
+// Add option event
+addOptionBtn.onclick = () => {
+    const val = optionInput.value.trim();
+    if (val && !options.includes(val)) {
+        options.push(val);
+        saveOptions();
+        updateOptionsList();
+        drawRoulette();
+        optionInput.value = '';
+    }
+};
+
+// Add option on Enter key
+optionInput.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+        addOptionBtn.click();
+    }
+});
+
+// Spin the wheel
+function spinWheel() {
+    if (spinning || options.length < 2) return;
+    spinning = true;
+    spinAngleStart = Math.random() * Math.PI * 2;
+    spinTime = 0;
+    spinTimeTotal = 3000 + Math.random() * 2000; // 3-5 seconds
+    rotateWheel();
+}
+
+// Animate the wheel rotation
+function rotateWheel() {
+    spinTime += 16;
+    if (spinTime >= spinTimeTotal) {
+        stopRotateWheel();
+        return;
+    }
+    const ease = easeOut(spinTime, 0, 2 * Math.PI, spinTimeTotal);
+    angle = spinAngleStart + ease;
+    drawRoulette();
+    spinTimeout = setTimeout(rotateWheel, 16);
+}
+
+// Stop the wheel and show the winner
+function stopRotateWheel() {
+    clearTimeout(spinTimeout);
+    const numOptions = options.length;
+    const arc = 2 * Math.PI / numOptions;
+    let degrees = angle * 180 / Math.PI + 90;
+    degrees = degrees % 360;
+    const index = numOptions - Math.floor(degrees / (360 / numOptions)) - 1;
+    const winner = options[(index + numOptions) % numOptions];
+    setTimeout(() => {
+        showResult(winner);
+        spinning = false;
+    }, 500);
+}
+
+// Easing function for smooth spin
+function easeOut(t, b, c, d) {
+    t /= d;
+    t--;
+    return c * (t * t * t + 1) + b;
+}
+
+// Show the winner popup
+function showResult(winner) {
+    winnerText.textContent = winner;
+    resultPopup.classList.remove('hidden');
+}
+
+// Close popup event
+closePopup.onclick = () => {
+    resultPopup.classList.add('hidden');
+};
+
+// Spin button event
+spinBtn.onclick = spinWheel;
+
+// Close popup when clicking outside
+window.onclick = function(event) {
+    if (event.target === resultPopup) {
+        resultPopup.classList.add('hidden');
+    }
+};
+
+// Responsive canvas resizing
+function resizeCanvas() {
+    let size = Math.min(window.innerWidth * 0.9, 350);
+    if (window.innerWidth < 500) {
+        size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.45);
+    }
+    canvas.width = size;
+    canvas.height = size;
+    drawRoulette();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// --- Initialization ---
+loadOptions();
+resizeCanvas();
+updateOptionsList();

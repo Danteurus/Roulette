@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roulette Web App</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Roulette</h1>
+        <div class="roulette-area">
+            <canvas id="rouletteCanvas" width="350" height="350"></canvas>
+        </div>
+        <div class="controls">
+            <input type="text" id="optionInput" placeholder="Add option...">
+            <button id="addOptionBtn">Add</button>
+        </div>
+        <ul id="optionsList"></ul>
+        <button id="spinBtn" class="spin">Spin</button>
+        <div id="resultPopup" class="popup hidden">
+            <div class="popup-content">
+                <span id="closePopup">&times;</span>
+                <h2>Winner!</h2>
+                <p id="winnerText"></p>
+            </div>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
