@@ -18,6 +18,7 @@ let spinTimeout = null;
 let spinAngleStart = 0;
 let spinTime = 0;
 let spinTimeTotal = 0;
+let spinRotations = 0;
 
 // Save options to localStorage
 function saveOptions() {
@@ -54,10 +55,10 @@ function drawRoulette() {
         ctx.font = '18px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('No options yet!', centerX, centerY - 10);
+        ctx.fillText('¡Sin opciones!', centerX, centerY - 10);
         ctx.font = '14px Arial';
         ctx.fillStyle = '#aaa';
-        ctx.fillText('Add options below', centerX, centerY + 16);
+        ctx.fillText('Agrega opciones abajo', centerX, centerY + 16);
         // Draw pointer
         ctx.save();
         ctx.beginPath();
@@ -115,20 +116,22 @@ function updateOptionsList() {
     optionsList.innerHTML = '';
     if (options.length === 0) {
         const li = document.createElement('li');
-        li.textContent = 'No options yet. Add some!';
+        li.textContent = 'Sin opciones. ¡Agrega alguna!';
         li.style.color = '#888';
         li.style.textAlign = 'center';
         optionsList.appendChild(li);
         spinBtn.disabled = true;
     } else {
-        spinBtn.disabled = options.length < 2;
+        spinBtn.disabled = options.length < 2 || spinning;
         options.forEach((opt, idx) => {
             const li = document.createElement('li');
             li.textContent = opt;
             const btn = document.createElement('button');
-            btn.textContent = 'Remove';
+            btn.textContent = 'Eliminar';
             btn.className = 'remove-btn';
+            btn.disabled = spinning;
             btn.onclick = () => {
+                if (spinning) return;
                 options.splice(idx, 1);
                 saveOptions();
                 updateOptionsList();
@@ -142,6 +145,7 @@ function updateOptionsList() {
 
 // Add option event
 addOptionBtn.onclick = () => {
+    if (spinning) return;
     const val = optionInput.value.trim();
     if (val && !options.includes(val)) {
         options.push(val);
@@ -163,9 +167,17 @@ optionInput.addEventListener('keyup', (e) => {
 function spinWheel() {
     if (spinning || options.length < 2) return;
     spinning = true;
+    spinBtn.disabled = true;
+    // Disable remove buttons
+    Array.from(document.getElementsByClassName('remove-btn')).forEach(btn => btn.disabled = true);
+    addOptionBtn.disabled = true;
+    optionInput.disabled = true;
+    // Scroll to the wheel
+    canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
     spinAngleStart = Math.random() * Math.PI * 2;
     spinTime = 0;
     spinTimeTotal = 3000 + Math.random() * 2000; // 3-5 seconds
+    spinRotations = 4 + Math.floor(Math.random() * 3); // 4-6 full spins
     rotateWheel();
 }
 
@@ -176,8 +188,13 @@ function rotateWheel() {
         stopRotateWheel();
         return;
     }
-    const ease = easeOut(spinTime, 0, 2 * Math.PI, spinTimeTotal);
-    angle = spinAngleStart + ease;
+    // Use easeOutCubic for smooth deceleration
+    const t = spinTime / spinTimeTotal;
+    // Ease from 0 to 1
+    const ease = t < 1 ? 1 - Math.pow(1 - t, 3) : 1;
+    // Total angle: start + (full spins + 1) * 2PI * ease
+    const totalSpins = spinRotations + 1;
+    angle = spinAngleStart + totalSpins * 2 * Math.PI * ease;
     drawRoulette();
     spinTimeout = setTimeout(rotateWheel, 16);
 }
@@ -194,6 +211,10 @@ function stopRotateWheel() {
     setTimeout(() => {
         showResult(winner);
         spinning = false;
+        spinBtn.disabled = false;
+        addOptionBtn.disabled = false;
+        optionInput.disabled = false;
+        updateOptionsList();
     }, 500);
 }
 
