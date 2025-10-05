@@ -93,12 +93,13 @@ function drawRoulette() {
         ctx.fillText(label, radius - 10, 6);
         ctx.restore();
     }
-    // Draw pointer
+    // Draw pointer (top, pointing downwards)
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(centerX, centerY - radius - 10);
-    ctx.lineTo(centerX - 15, centerY - radius + 10);
-    ctx.lineTo(centerX + 15, centerY - radius + 10);
+    // Base of triangle on top, tip on bottom (points down)
+    ctx.moveTo(centerX - 15, centerY - radius - 10); // left base
+    ctx.lineTo(centerX + 15, centerY - radius - 10); // right base
+    ctx.lineTo(centerX, centerY - radius + 15); // tip (down)
     ctx.closePath();
     ctx.fillStyle = '#e74c3c';
     ctx.fill();
