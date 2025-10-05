@@ -1,3 +1,9 @@
+// Allow closing popup with Esc or Enter key
+window.addEventListener('keydown', function(event) {
+    if (!resultPopup.classList.contains('hidden') && (event.key === 'Escape' || event.key === 'Enter')) {
+        resultPopup.classList.add('hidden');
+    }
+});
 
 // --- DOM Elements ---
 const canvas = document.getElementById('rouletteCanvas');
@@ -59,12 +65,12 @@ function drawRoulette() {
         ctx.font = '14px Arial';
         ctx.fillStyle = '#aaa';
         ctx.fillText('Agrega opciones abajo', centerX, centerY + 16);
-        // Draw pointer
+        // Draw pointer (top, pointing downwards)
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(centerX, centerY - radius - 10);
-        ctx.lineTo(centerX - 15, centerY - radius + 10);
-        ctx.lineTo(centerX + 15, centerY - radius + 10);
+        ctx.moveTo(centerX - 15, centerY - radius - 10); // left base
+        ctx.lineTo(centerX + 15, centerY - radius - 10); // right base
+        ctx.lineTo(centerX, centerY - radius + 15); // tip (down)
         ctx.closePath();
         ctx.fillStyle = '#e74c3c';
         ctx.fill();
@@ -83,14 +89,25 @@ function drawRoulette() {
         ctx.fill();
         ctx.save();
         ctx.translate(centerX, centerY);
-        ctx.rotate(startAngle + arc / 2);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 16px Arial';
-        // Truncate long options for mobile
         let label = options[i];
-        if (canvas.width < 300 && label.length > 10) label = label.slice(0, 10) + '…';
-        ctx.fillText(label, radius - 10, 6);
+        if (numOptions === 1) {
+            // Special case: one option, center and upright
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 20px Arial';
+            let maxLabelLength = 18;
+            if (label.length > maxLabelLength) label = label.slice(0, maxLabelLength) + '…';
+            ctx.fillText(label, 0, 0);
+        } else {
+            ctx.rotate(startAngle + arc / 2);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Arial';
+            // Truncate long options for mobile
+            if (canvas.width < 300 && label.length > 10) label = label.slice(0, 10) + '…';
+            ctx.fillText(label, radius - 10, 6);
+        }
         ctx.restore();
     }
     // Draw pointer (top, pointing downwards)
@@ -175,10 +192,21 @@ function spinWheel() {
     optionInput.disabled = true;
     // Scroll to the wheel
     canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    spinAngleStart = Math.random() * Math.PI * 2;
+    spinAngleStart = angle;
     spinTime = 0;
     spinTimeTotal = 3000 + Math.random() * 2000; // 3-5 seconds
     spinRotations = 4 + Math.floor(Math.random() * 3); // 4-6 full spins
+    // Add a random offset to the final angle so the wheel lands on a random option
+    const numOptions = options.length;
+    if (numOptions > 0) {
+        const randomSlice = Math.floor(Math.random() * numOptions);
+        const arc = 2 * Math.PI / numOptions;
+        // The pointer is at -90deg (top), so offset by -Math.PI/2
+        const targetAngle = randomSlice * arc - Math.PI / 2 + arc / 2;
+        window.spinTargetOffset = ((targetAngle - angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    } else {
+        window.spinTargetOffset = 0;
+    }
     rotateWheel();
 }
 
@@ -193,9 +221,10 @@ function rotateWheel() {
     const t = spinTime / spinTimeTotal;
     // Ease from 0 to 1
     const ease = t < 1 ? 1 - Math.pow(1 - t, 3) : 1;
-    // Total angle: start + (full spins + 1) * 2PI * ease
+    // Total angle: start + (full spins + 1) * 2PI * ease + random offset
     const totalSpins = spinRotations + 1;
-    angle = spinAngleStart + totalSpins * 2 * Math.PI * ease;
+    const offset = typeof window.spinTargetOffset === 'number' ? window.spinTargetOffset : 0;
+    angle = spinAngleStart + (totalSpins * 2 * Math.PI + offset) * ease;
     drawRoulette();
     spinTimeout = setTimeout(rotateWheel, 16);
 }
